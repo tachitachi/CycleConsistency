@@ -4,6 +4,9 @@ import util
 import numpy as np
 import gzip
 import struct
+import tarfile
+import pickle
+import os
 
 # CIFAR-10 download link
 # https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
@@ -24,6 +27,63 @@ def register_dataset(name):
 
 def get_dataset(name, *args, **kwargs):
     return datasets[name](*args, **kwargs)
+
+@register_dataset('cifar10')
+class cifar10(object):
+    url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+    splits = ['train', 'test']
+    batches = {
+        'train': ['cifar-10-batches-py/data_batch_1', 'cifar-10-batches-py/data_batch_2', 
+                  'cifar-10-batches-py/data_batch_3', 'cifar-10-batches-py/data_batch_4', 
+                  'cifar-10-batches-py/data_batch_5'],
+        'test': ['cifar-10-batches-py/test_batch'],
+    }
+
+    def __init__(self, split):
+        assert(split in cifar10.splits)
+
+        # check if downloads exist, and download otherwise
+        file = util.download(cifar10.url)
+
+        tar = tarfile.open(file, "r:gz")
+        tar.extractall(os.path.dirname(file))
+        tar.close()
+
+        filenames = list(map(lambda x: os.path.join('data', x), cifar10.batches[split]))
+
+        # parse mats and read into tf.data.Dataset
+        self.x, self.y = self._load(filenames)
+
+    def _load(self, filenames):
+        # Must initialize tf.GraphKeys.TABLE_INITIALIZERS
+        # sess.run(tf.get_collection(tf.GraphKeys.TABLE_INITIALIZERS))
+
+        X_list = []
+        y_list = []
+
+        for file in filenames:
+            with open(file, 'rb') as fo:
+                data = pickle.load(fo, encoding='bytes')
+                #print(data)
+                partial_X = np.asarray(data[b'data']).reshape([-1, 3, 32, 32]).transpose(0, 2, 3, 1).astype(np.float32) / 255
+                partial_y = np.asarray(data[b'labels']).astype(np.int64)
+                X_list.append(partial_X)
+                y_list.append(partial_y)
+        
+
+        X = np.concatenate(X_list, axis=0)
+        y = np.concatenate(y_list, axis=0)
+
+        # load into tf.data.Dataset
+        dataset = tf.data.Dataset.from_tensor_slices((X, y))
+        dataset = dataset.repeat()
+        iterator = dataset.make_initializable_iterator()
+        next_X, next_y = iterator.get_next()
+
+        tf.add_to_collection(tf.GraphKeys.TABLE_INITIALIZERS, iterator.initializer)
+
+        return next_X, next_y
+
 
 @register_dataset('svhn')
 class SVHN(object):
@@ -132,4 +192,4 @@ def create_batch(tensors, batch_size=32, shuffle=False, queue_size=10000, min_qu
 
 
 if __name__ == '__main__':
-    dataset = get_dataset('mnist', 'train')
+    dataset = get_dataset('cifar10', 'train')

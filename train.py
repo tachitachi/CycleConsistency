@@ -11,13 +11,13 @@ import os
 def main(args):
 
 	# get datasets
-	source_dataset = data.get_dataset('svhn', 'train')
-	target_dataset = data.get_dataset('mnist', 'train')
+	source_dataset = data.get_dataset(args.source, args.split)
+	target_dataset = data.get_dataset(args.target, args.split)
 
-	im_s = preprocess(source_dataset.x, 'simple', image_size=28, output_channels=1)
+	im_s = preprocess(source_dataset.x, args.preprocessing, image_size=args.image_size, output_channels=args.output_channels)
 	label_s = source_dataset.y
 
-	im_t = preprocess(target_dataset.x, 'simple', image_size=28, output_channels=1)
+	im_t = preprocess(target_dataset.x, args.preprocessing, image_size=args.image_size, output_channels=args.output_channels)
 	label_t = target_dataset.y
 
 	im_batch_s, label_batch_s, im_batch_t, label_batch_t = data.create_batch([im_s, label_s, im_t, label_t], batch_size=args.batch_size, shuffle=args.shuffle)
@@ -103,6 +103,7 @@ def main(args):
 				last_log_time = time.time()
 				summary, loss_val, global_step = sess.run([summary_op, train_op, tf.train.get_global_step()])
 				writer.add_summary(summary, global_step)
+				writer.flush()
 			else:
 				loss_val, global_step = sess.run([train_op, tf.train.get_global_step()])
 
@@ -116,6 +117,12 @@ def main(args):
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
+	parser.add_argument('--source', type=str, default='svhn')
+	parser.add_argument('--target', type=str, default='mnist')
+	parser.add_argument('--split', type=str, default='train')
+	parser.add_argument('--preprocessing', type=str, default='simple')
+	parser.add_argument('--image_size', type=int, default=28)
+	parser.add_argument('--output_channels', type=int, default=1)
 	parser.add_argument('--batch_size', type=int, default=128)
 	parser.add_argument('--num_batches', type=int, default=10000)
 	parser.add_argument('--shuffle', type=bool, default=True)
