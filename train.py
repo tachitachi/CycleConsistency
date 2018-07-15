@@ -6,6 +6,7 @@ from preprocessing import preprocess
 import time
 import model
 from tqdm import tqdm
+import os
 
 def main(args):
 
@@ -24,11 +25,11 @@ def main(args):
 
 	# build models
 
-	transformed_s = model.transformer(im_batch_s, scope='s_to_t')
-	transformed_t = model.transformer(im_batch_t, scope='t_to_s')
+	transformed_s = model.transformer(im_batch_s, scope='model/s_to_t')
+	transformed_t = model.transformer(im_batch_t, scope='model/t_to_s')
 
-	cycled_s = model.transformer(transformed_s, scope='t_to_s', reuse=True)
-	cycled_t = model.transformer(transformed_t, scope='s_to_t', reuse=True)
+	cycled_s = model.transformer(transformed_s, scope='model/t_to_s', reuse=True)
+	cycled_t = model.transformer(transformed_t, scope='model/s_to_t', reuse=True)
 
 	# create loss functions
 
@@ -81,6 +82,11 @@ def main(args):
 
 	# create train loop
 
+	if not os.path.isdir(args.output_dir):
+		os.makedirs(args.output_dir)
+
+	saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model'))
+	checkpoint_path = os.path.join(args.output_dir, 'model.ckpt')
 	writer = tf.summary.FileWriter(args.output_dir)
 
 	with tf.Session() as sess:
@@ -91,13 +97,20 @@ def main(args):
 		sess.run(tf.local_variables_initializer())
 
 		last_log_time = 0
+		last_save_time = 0
 		for i in tqdm(range(args.num_batches)):
 			if last_log_time < time.time() - args.log_every_n_seconds:
-				summary, loss_val, global_step = sess.run([summary_op, train_op, tf.train.get_global_step()])
 				last_log_time = time.time()
+				summary, loss_val, global_step = sess.run([summary_op, train_op, tf.train.get_global_step()])
 				writer.add_summary(summary, global_step)
 			else:
 				loss_val, global_step = sess.run([train_op, tf.train.get_global_step()])
+
+			if last_save_time < time.time() - args.save_every_n_seconds:
+				last_save_time = time.time()
+				saver.save(sess, checkpoint_path, global_step=global_step)
+
+		saver.save(sess, checkpoint_path, global_step=args.num_batches)
 
 
 
@@ -108,6 +121,7 @@ if __name__ == '__main__':
 	parser.add_argument('--shuffle', type=bool, default=True)
 	parser.add_argument('--output_dir', type=str, default='output/%d' % int(time.time() * 1000))
 	parser.add_argument('--log_every_n_seconds', type=int, default=30)
+	parser.add_argument('--save_every_n_seconds', type=int, default=300)
 	parser.add_argument('--learning_rate', type=float, default=1e-4)
 	parser.add_argument('--beta1', type=float, default=0.9)
 	parser.add_argument('--beta2', type=float, default=0.99)
