@@ -273,16 +273,22 @@ class KITTI(object):
             next_X = tf.squeeze(tf.image.resize_images(tf.expand_dims(next_X, 0), [image_size, image_size]), [0])
             next_y = tf.squeeze(tf.image.resize_images(tf.expand_dims(next_y, 0), [image_size, image_size], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR), [0])
 
+        next_X.set_shape([None, None, 3])
+        next_y.set_shape([None, None, 1])
 
-        tf.summary.image('input_image', next_X)
+
+        tf.summary.image('input_image', tf.expand_dims(next_X, 0))
 
         # Convert output to one hot?
         color_map = np.array(list(map(lambda x: x.color, labels[:KITTI.num_classes]))).astype(np.float32)
-        segmentation_rgb = segmentation_to_rgb(next_y, KITTI.num_classes, color_map, one_hot=False)
 
+        flat_segmentation = tf.reshape(next_y, [-1])
+        seg = tf.one_hot(flat_segmentation, KITTI.num_classes)
+
+        segmentation_rgb = segmentation_to_rgb(tf.expand_dims(next_y, 0), KITTI.num_classes, color_map)
         tf.summary.image('gt_segmentation', segmentation_rgb)
 
-        next_X = next_X * 2.0 - 1.0
+        next_y = tf.reshape(seg, [next_y.shape[0], next_y.shape[1], KITTI.num_classes])
 
         return next_X, next_y
 
