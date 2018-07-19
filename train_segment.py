@@ -24,19 +24,19 @@ def main(args):
 
 	# build models
 
-	transformed_x = model.transformer(im_batch_x, output_channels=dataset.num_classes, output_fn='softmax', scope='model/AtoB')
+	transformed_x = model.transformer(im_batch_x, output_channels=dataset.num_classes, output_fn=None, scope='model/AtoB')
 	transformed_y = model.transformer(im_batch_y, output_channels=args.num_channels, scope='model/BtoA')
 
 	cycled_x = model.transformer(transformed_x, output_channels=args.num_channels, scope='model/BtoA', reuse=True)
-	cycled_y = model.transformer(transformed_y, output_channels=dataset.num_classes, output_fn='softmax', scope='model/AtoB', reuse=True)
+	cycled_y = model.transformer(transformed_y, output_channels=dataset.num_classes, output_fn=None, scope='model/AtoB', reuse=True)
 
 	# create loss functions
 
 	cycle_loss_x = tf.losses.absolute_difference(im_batch_x, cycled_x, scope='cycle_loss_x')
-	cycle_loss_y = tf.losses.absolute_difference(im_batch_y, cycled_y, scope='cycle_loss_y')
+	cycle_loss_y = tf.losses.softmax_cross_entropy(im_batch_y, cycled_y, scope='cycle_loss_y')
 
 	transform_loss_xy = tf.losses.absolute_difference(im_batch_x, transformed_y, scope='transform_loss_xy')
-	transform_loss_yx = tf.losses.absolute_difference(im_batch_y, transformed_x, scope='transform_loss_yx')
+	transform_loss_yx = tf.losses.softmax_cross_entropy(im_batch_y, transformed_x, scope='transform_loss_yx')
 
 	total_loss = cycle_loss_x + cycle_loss_y + transform_loss_xy + transform_loss_yx
 
