@@ -27,7 +27,7 @@ def main(args):
 	transformed_x = model.transformer(im_batch_x, output_channels=dataset.num_classes, output_fn=None, scope='model/AtoB')
 	transformed_y = model.transformer(im_batch_y, output_channels=args.num_channels, scope='model/BtoA')
 
-	cycled_x = model.transformer(transformed_x, output_channels=args.num_channels, scope='model/BtoA', reuse=True)
+	cycled_x = model.transformer(tf.nn.softmax(transformed_x), output_channels=args.num_channels, scope='model/BtoA', reuse=True)
 	cycled_y = model.transformer(transformed_y, output_channels=dataset.num_classes, output_fn=None, scope='model/AtoB', reuse=True)
 
 	# create loss functions
